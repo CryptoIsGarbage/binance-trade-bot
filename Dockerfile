@@ -1,20 +1,16 @@
-FROM --platform=$BUILDPLATFORM python:3.8 as builder
+FROM python:3.9
 
-WORKDIR /install
-
-COPY requirements.txt /requirements.txt
-
-RUN apt-get update && apt-get install -y curl && \
-    curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y && \
-    . /root/.cargo/env && \
-    rustup toolchain install 1.41.0 && \
-    pip install --prefix=/install -r /requirements.txt
-
-FROM python:3.8-slim
+RUN apt-get update \
+    && apt-get install -y \
+    sqlite3 \
+    rustc \
+    && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 
-COPY --from=builder /install /usr/local
+COPY ./requirements.txt .
+RUN pip install -r ./requirements.txt
+
 COPY . .
 
 CMD ["python", "-m", "binance_trade_bot"]
