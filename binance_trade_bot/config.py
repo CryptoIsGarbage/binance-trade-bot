@@ -9,6 +9,9 @@ USER_CFG_SECTION = "binance_user_config"
 
 
 class Config:  # pylint: disable=too-few-public-methods,too-many-instance-attributes
+    ORDER_TYPE_MARKET = "market"
+    ORDER_TYPE_LIMIT = "limit"
+    
     PRICE_TYPE_ORDERBOOK = "orderbook"
     PRICE_TYPE_TICKER = "ticker"
     def __init__(self):
@@ -23,6 +26,11 @@ class Config:  # pylint: disable=too-few-public-methods,too-many-instance-attrib
             "strategy": "default",
             "sell_timeout": "0",
             "buy_timeout": "0",
+            "sell_order_type": self.ORDER_TYPE_MARKET,
+            "buy_order_type": self.ORDER_TYPE_LIMIT,
+            "sell_max_price_change": "0.005",
+            "buy_max_price_change": "0.005",
+            "price_type": self.PRICE_TYPE_ORDERBOOK,
             "notification_name": "trader",
             "enable_api": "False",
             "db_uri": "sqlite:///data/crypto_trading.db",
