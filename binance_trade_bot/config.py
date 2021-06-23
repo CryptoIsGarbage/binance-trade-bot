@@ -9,6 +9,8 @@ USER_CFG_SECTION = "binance_user_config"
 
 
 class Config:  # pylint: disable=too-few-public-methods,too-many-instance-attributes
+    PRICE_TYPE_ORDERBOOK = "orderbook"
+    PRICE_TYPE_TICKER = "ticker"
     def __init__(self):
         # Init config
         config = configparser.ConfigParser()
