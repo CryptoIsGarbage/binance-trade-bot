@@ -23,13 +23,16 @@ class BinanceOrder:  # pylint: disable=too-few-public-methods
         self.status = report["current_order_status"]
         self.price = float(report["order_price"])
         self.time = report["transaction_time"]
+        self.cumulative_filled_quantity = float(report["cumulative_filled_quantity"])
 
     def __repr__(self):
         return f"<BinanceOrder {self.event}>"
 
 
 class BinanceCache:  # pylint: disable=too-few-public-methods
-    ticker_values: Dict[str, float] = {}
+    ticker_values: Dict[str, float] = {}    
+    ticker_values_ask: Dict[str, float] = {}
+    ticker_values_bid: Dict[str, float] = {}
     _balances: Dict[str, float] = {}
     _balances_mutex: threading.Lock = threading.Lock()
     non_existent_tickers: Set[str] = set()
@@ -78,6 +81,20 @@ class BinanceStreamManager:
         self.bw_api_manager.create_stream(
             ["arr"], ["!userData"], api_key=config.BINANCE_API_KEY, api_secret=config.BINANCE_API_SECRET_KEY
         )
+
+
+        if config.PRICE_TYPE == Config.PRICE_TYPE_ORDERBOOK:
+            supported_coin_list=config.SUPPORTED_COIN_LIST
+            bridge_coin=config.BRIDGE_SYMBOL
+            symbols = []
+            for symbol in supported_coin_list:
+                symbol=symbol.lower()+ bridge_coin.lower()
+                symbols.append(symbol)
+
+            self.bw_api_manager.create_stream(
+                ["bookTicker"], symbols
+            )
+            
         self.binance_client = binance_client
         self.pending_orders: Set[Tuple[str, int]] = set()
         self.pending_orders_mutex: threading.Lock = threading.Lock()
@@ -107,6 +124,7 @@ class BinanceStreamManager:
                 "order_type": order["type"],
                 "order_id": order["orderId"],
                 "cumulative_quote_asset_transacted_quantity": float(order["cummulativeQuoteQty"]),
+                "cumulative_filled_quantity": float(order["executedQty"]),
                 "current_order_status": order["status"],
                 "order_price": float(order["price"]),
                 "transaction_time": order["time"],
@@ -132,10 +150,10 @@ class BinanceStreamManager:
                 if signal_type == "CONNECT":
                     stream_info = self.bw_api_manager.get_stream_info(stream_id)
                     if "!userData" in stream_info["markets"]:
-                        self.logger.debug("Connect for userdata arrived")
+                        self.logger.debug("Connect for userdata arrived", False)
                         self._fetch_pending_orders()
                         self._invalidate_balances()
-            if stream_data is not False:
+            if stream_data is not False and "event_type" in stream_data:
                 self._process_stream_data(stream_data)
             if stream_data is False and stream_signal is False:
                 time.sleep(0.01)
@@ -160,6 +178,9 @@ class BinanceStreamManager:
         elif event_type == "24hrMiniTicker":
             for event in stream_data["data"]:
                 self.cache.ticker_values[event["symbol"]] = float(event["close_price"])
+        elif event_type == "bookTicker":
+                self.cache.ticker_values_ask[stream_data["symbol"]] = float(stream_data["best_ask_price"])
+                self.cache.ticker_values_bid[stream_data["symbol"]] = float(stream_data["best_bid_price"])
         else:
             self.logger.error(f"Unknown event type found: {event_type}\n{stream_data}")
 
