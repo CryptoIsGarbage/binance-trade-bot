@@ -21,7 +21,7 @@ class Logger:
         if enable_notifications:
             try:
                 notification_formatter = logging.Formatter(
-                    f"```\n<{config.NOTIFICATION_NAME}>: %(name)s - %(levelname)s - %(message)s\n```")
+                    f"&lt;{config.NOTIFICATION_NAME}&gt;: %(name)s - %(levelname)s - %(message)s")
                 notification_handler = NotificationHandler()
                 notification_handler.setLevel(logging.INFO)
                 notification_handler.setFormatter(notification_formatter)
