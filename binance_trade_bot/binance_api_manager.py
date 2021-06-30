@@ -154,21 +154,52 @@ class BinanceAPIManager:
     def get_min_notional(self, origin_symbol: str, target_symbol: str):
         return float(self.get_symbol_filter(origin_symbol, target_symbol, "MIN_NOTIONAL")["minNotional"])
 
+    def convert_legacy_order(self, legacyOrder):
+        self.logger.debug(f"Converting legacy order {legacyOrder}")
+        event = dict()
+        event["symbol"] = legacyOrder["symbol"]
+        event["side"] = legacyOrder["side"]
+        event["order_type"] = legacyOrder["type"]
+        event["order_id"] = legacyOrder["orderId"]
+        event["cumulative_quote_asset_transacted_quantity"] = legacyOrder["cummulativeQuoteQty"]
+        event["current_order_status"] = legacyOrder["status"]
+        event["order_price"] = legacyOrder["price"]
+        event["transaction_time"] = legacyOrder["time"]
+
+        return BinanceOrder(event)
+
+
     def _wait_for_order(
         self, order_id, origin_symbol: str, target_symbol: str
     ) -> Optional[BinanceOrder]:  # pylint: disable=unsubscriptable-object
+        pollCounter = 0
         while True:
             order_status: BinanceOrder = self.cache.orders.get(order_id, None)
             if order_status is not None:
                 break
             self.logger.debug(f"Waiting for order {order_id} to be created")
+            pollCounter += 1
+            if pollCounter % 10 == 0:
+                self.logger.debug(f"Performing manual poll for {order_id} creation in case websockets broke")
+                try:
+                    order_status = self.convert_legacy_order(self.binance_client.get_order(symbol=origin_symbol + target_symbol, orderId=order_id))
+                    break
+                except BinanceAPIException as e:
+                    self.logger.debug(f"Order exception: {e}")
+                except Exception as e:  # pylint: disable=broad-except
+                    self.logger.info(f"Unexpected order creation error: {e}")
             time.sleep(1)
 
         self.logger.debug(f"Order created: {order_status}")
+        pollCounter = 0
 
         while order_status.status != "FILLED":
             try:
                 order_status = self.cache.orders.get(order_id, order_status)
+                pollCounter += 1
+                if pollCounter % 60 == 0:
+                    self.logger.debug(f"Performing manual poll for {order_id} status in case websockets broke")
+                    order_status = self.convert_legacy_order(self.binance_client.get_order(symbol=origin_symbol + target_symbol, orderId=order_id))
 
                 self.logger.debug(f"Waiting for order {order_id} to be filled")
 
