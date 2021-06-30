@@ -168,7 +168,6 @@ class BinanceAPIManager:
 
         return BinanceOrder(event)
 
-
     def _wait_for_order(
         self, order_id, origin_symbol: str, target_symbol: str
     ) -> Optional[BinanceOrder]:  # pylint: disable=unsubscriptable-object
